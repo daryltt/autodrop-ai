@@ -139,10 +139,19 @@ export const authConfig = {
      * For OAuth sign-ins, ensure the user row exists with a role before the
      * `jwt` callback runs.  Credentials sign-ins already carry the role
      * directly from the `authorize` return value, so they are skipped.
+     *
+     * If the DB upsert fails (e.g. connection error), we log the error and
+     * return `false` to block sign-in rather than let the user proceed with
+     * a session that has no resolvable role.
      */
     async signIn({ user, account }) {
       if (account?.provider !== "credentials" && user.email) {
-        await ensureOAuthUserWithRole(user.email, user.name, user.image);
+        try {
+          await ensureOAuthUserWithRole(user.email, user.name, user.image);
+        } catch (err) {
+          console.error("[auth] signIn: failed to upsert OAuth user with role", err);
+          return false;
+        }
       }
       return true;
     },
@@ -152,7 +161,7 @@ export const authConfig = {
         token.userId = user.id;
       }
 
-      if (user && "role" in user) {
+      if (user?.role !== undefined) {
         token.role = resolveRole(user.role, "jwt/user");
       }
 

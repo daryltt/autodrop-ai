@@ -19,6 +19,6 @@ export function resolveRole(role: unknown, context?: string): RoleName {
   }
 
   const ctx = context ? ` (context: ${context})` : "";
-  console.warn(`[auth] resolveRole: unexpected role value${ctx}; defaulting to VIEWER`);
+  console.warn(`[auth] resolveRole: unexpected role value (type: ${typeof role})${ctx}; defaulting to VIEWER`);
   return "VIEWER";
 }
