@@ -1,0 +1,29 @@
+{
+  "name": "@autodrop/db",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json --emitDeclarationOnly",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "type-check": "tsc -p tsconfig.json --noEmit",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:seed": "tsx src/seed.ts",
+    "db:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@autodrop/config": "workspace:*",
+    "@prisma/client": "^5.14.0"
+  },
+  "devDependencies": {
+    "@node-rs/argon2": "^2.0.2",
+    "@types/node": "^20.0.0",
+    "dotenv": "^16.4.0",
+    "prisma": "^5.14.0",
+    "tsx": "^4.11.0",
+    "typescript": "^5.4.0"
+  }
+}
