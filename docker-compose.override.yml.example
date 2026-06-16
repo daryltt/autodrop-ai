@@ -1,0 +1,9 @@
+services:
+  web:
+    environment:
+      STORAGE_PROVIDER: local
+      LOCAL_STORAGE_PATH: ./storage
+    volumes:
+      - ./storage:/app/storage
+    ports:
+      - "3001:3000"

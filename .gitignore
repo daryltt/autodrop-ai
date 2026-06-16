@@ -1,0 +1,37 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build outputs
+.next/
+dist/
+coverage/
+playwright-report/
+test-results/
+.turbo/
+
+# runtime data
+storage/
+uploads/
+
+# environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# prisma
+packages/db/prisma/dev.db
+packages/db/prisma/*.db
+packages/db/prisma/*.db-journal
+
+# misc
+.DS_Store
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.vscode/
+.idea/
