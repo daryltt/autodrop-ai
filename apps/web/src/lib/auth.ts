@@ -8,6 +8,9 @@ import { getEnv } from "@autodrop/config";
 import { prisma, RoleName } from "@autodrop/db";
 import type { RoleName as AppRoleName } from "@autodrop/types";
 import { verifyPassword } from "@/lib/password";
+import { resolveRole } from "@/lib/auth-utils";
+
+export { resolveRole } from "@/lib/auth-utils";
 
 const env = getEnv();
 const credentialsSchema = z.object({
@@ -23,6 +26,27 @@ async function ensureDefaultRole() {
       name: RoleName.VIEWER,
       description: "Default viewer role"
     }
+  });
+}
+
+/**
+ * Ensures that a User row exists in the database for the given OAuth profile
+ * and that it has a role assigned.  This is the primary place where
+ * default-role assignment happens for OAuth sign-ins when using the JWT
+ * session strategy, because the Prisma adapter's `createUser` hook is not
+ * guaranteed to be invoked on every first-time OAuth sign-in under JWT.
+ */
+async function ensureOAuthUserWithRole(email: string, name?: string | null, image?: string | null): Promise<void> {
+  const defaultRole = await ensureDefaultRole();
+  await prisma.user.upsert({
+    where: { email },
+    create: {
+      email,
+      name: name ?? null,
+      image: image ?? null,
+      roleId: defaultRole.id
+    },
+    update: {}
   });
 }
 
@@ -74,6 +98,14 @@ if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
   );
 }
 
+/**
+ * The Prisma adapter is retained so that OAuth Account rows are persisted
+ * (enabling account linking and email-based lookups).  Its `createUser` hook
+ * is customised to assign the default VIEWER role.  However, because
+ * Auth.js v5 with `strategy: "jwt"` does not guarantee that `createUser`
+ * runs for every first-time OAuth sign-in, the `signIn` callback below
+ * performs a DB upsert as the authoritative role-assignment path.
+ */
 const baseAdapter = PrismaAdapter(prisma);
 const adapter: Adapter = {
   ...baseAdapter,
@@ -103,13 +135,25 @@ export const authConfig = {
     signIn: "/auth/sign-in"
   },
   callbacks: {
+    /**
+     * For OAuth sign-ins, ensure the user row exists with a role before the
+     * `jwt` callback runs.  Credentials sign-ins already carry the role
+     * directly from the `authorize` return value, so they are skipped.
+     */
+    async signIn({ user, account }) {
+      if (account?.provider !== "credentials" && user.email) {
+        await ensureOAuthUserWithRole(user.email, user.name, user.image);
+      }
+      return true;
+    },
+
     async jwt({ token, user }) {
       if (user?.id) {
         token.userId = user.id;
       }
 
-      if (user?.role) {
-        token.role = user.role;
+      if (user && "role" in user) {
+        token.role = resolveRole(user.role, "jwt/user");
       }
 
       const email = user?.email ?? token.email;
@@ -121,19 +165,17 @@ export const authConfig = {
 
         if (dbUser) {
           token.userId = dbUser.id;
-          token.role = dbUser.role.name as AppRoleName;
+          token.role = resolveRole(dbUser.role?.name, "jwt/db");
         }
       }
 
       return token;
     },
+
     async session({ session, token }) {
       if (session.user) {
         session.user.id = typeof token.userId === "string" ? token.userId : "";
-        session.user.role =
-          token.role === "ADMIN" || token.role === "MANAGER" || token.role === "STAFF" || token.role === "VIEWER"
-            ? token.role
-            : "VIEWER";
+        session.user.role = resolveRole(token.role, "session");
       }
 
       return session;

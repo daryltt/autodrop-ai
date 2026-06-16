@@ -9,6 +9,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const session = await auth();
 
   if (!session?.user) {
+    // Defense-in-depth: middleware already redirects with callbackUrl; this
+    // catches any edge-cases that slip past it (e.g., direct server renders
+    // that bypass the middleware matcher).
     redirect("/auth/sign-in");
   }
 

@@ -11,7 +11,7 @@ const nextConfig: NextConfig = {
   output: "standalone",
   reactStrictMode: true,
   eslint: {
-    ignoreDuringBuilds: true
+    ignoreDuringBuilds: false
   },
   transpilePackages: ["@autodrop/db", "@autodrop/config", "@autodrop/types"],
   async headers() {

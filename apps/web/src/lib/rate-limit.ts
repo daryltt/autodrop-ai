@@ -1,22 +1,49 @@
+/**
+ * In-memory rate limiter for authentication endpoints.
+ *
+ * **Limitations:** the store lives in Node.js process memory.  It resets on
+ * every process restart and is NOT shared across multiple server instances
+ * (e.g., a multi-replica deployment or serverless cold starts).
+ *
+ * This is intentional and acceptable for single-instance self-hosting (the
+ * primary deployment target for Phase 1).  A clean seam (`RateLimitStore`)
+ * is provided below so a shared backend (e.g., Redis via `ioredis`) can be
+ * dropped in during a later phase without touching call-sites.
+ */
 import type { NextRequest } from "next/server";
 
-type RateLimitEntry = {
+export type RateLimitEntry = {
   count: number;
   resetAt: number;
 };
 
-type RateLimitResult = {
+export type RateLimitResult = {
   allowed: boolean;
   remaining: number;
   resetAt: number;
 };
 
+/**
+ * Pluggable storage interface for the rate limiter.
+ * Swap in a Redis-backed implementation in a later phase if needed.
+ */
+export interface RateLimitStore {
+  get(key: string): RateLimitEntry | undefined;
+  set(key: string, entry: RateLimitEntry): void;
+}
+
+/** Default in-memory store — persisted on `globalThis` to survive HMR reloads. */
 const globalRateLimitStore = globalThis as typeof globalThis & {
   __autodropRateLimitStore?: Map<string, RateLimitEntry>;
 };
 
-const store = globalRateLimitStore.__autodropRateLimitStore ?? new Map<string, RateLimitEntry>();
-globalRateLimitStore.__autodropRateLimitStore = store;
+const defaultStore: RateLimitStore =
+  globalRateLimitStore.__autodropRateLimitStore ??
+  (() => {
+    const map = new Map<string, RateLimitEntry>();
+    globalRateLimitStore.__autodropRateLimitStore = map;
+    return map;
+  })();
 
 export function getClientIp(request: NextRequest): string {
   const forwarded = request.headers.get("x-forwarded-for");
@@ -27,7 +54,12 @@ export function getClientIp(request: NextRequest): string {
   return request.headers.get("x-real-ip") ?? "unknown";
 }
 
-export function checkRateLimit(key: string, limit: number, windowMs: number): RateLimitResult {
+export function checkRateLimit(
+  key: string,
+  limit: number,
+  windowMs: number,
+  store: RateLimitStore = defaultStore
+): RateLimitResult {
   const now = Date.now();
   const existing = store.get(key);
 

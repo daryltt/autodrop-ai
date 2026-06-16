@@ -16,7 +16,25 @@ Phase 1 establishes a production-ready monorepo foundation for a self-hostable, 
 - Auth.js v5 with JWT sessions is used for app authentication.
 - Credentials auth uses Argon2id password hashing.
 - Google OAuth is optional and only enabled when credentials are configured.
-- Middleware protects dashboard routes and rate limits authentication endpoints.
+- Route protection is enforced at two layers (defence-in-depth):
+  1. **Middleware** (`src/middleware.ts`) wraps with `auth()` from a lightweight
+     Edge-safe config (`src/lib/auth.config.ts`, no Prisma or argon2) and
+     validates the signed JWT — not just cookie presence — before allowing
+     requests through to `/dashboard/*`.
+  2. **Dashboard layout** (`src/app/dashboard/layout.tsx`) calls `auth()` on
+     the server component and redirects to sign-in if no valid session exists.
+     This catches any edge cases that might bypass the middleware layer.
+- **Prisma adapter + JWT strategy**: the Prisma adapter is retained for
+  persisting OAuth `Account` rows and enabling account linking.  Its custom
+  `createUser` assigns the default `VIEWER` role.  Because Auth.js v5 does not
+  guarantee that `createUser` fires for every first-time OAuth sign-in under
+  the JWT strategy, the `signIn` callback in `auth.ts` performs an authoritative
+  DB upsert to ensure the user row exists with a role before the JWT/session
+  callbacks run.  Credentials sign-ins are unaffected; they carry the role
+  directly from `authorize()`.
+- The `resolveRole` helper in `auth.ts` centralises "valid role or VIEWER"
+  logic used in both the `jwt` and `session` callbacks, and logs a warning
+  (without leaking token values) when an unexpected role is encountered.
 - AES-256-GCM is used for application-level secret encryption.
 
 ## Data layer
