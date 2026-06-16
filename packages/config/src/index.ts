@@ -7,7 +7,7 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   APP_NAME: z.string().default("AutoDrop AI"),
   APP_URL: z.string().url().default("http://localhost:3000"),
-  DATABASE_URL: z.string().min(1).default("******localhost:5432/autodrop"),
+  DATABASE_URL: z.string().min(1).default("postgresql://autodrop:autodrop_secret@localhost:5432/autodrop"),
   NEXTAUTH_URL: z.string().url().default("http://localhost:3000"),
   NEXTAUTH_SECRET: z.string().min(16).default("autodrop-phase-one-local-secret"),
   ENCRYPTION_KEY: z.string().regex(/^[0-9a-fA-F]{64}$/).default("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),

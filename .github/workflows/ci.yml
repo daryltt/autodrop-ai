@@ -25,7 +25,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: ******localhost:5432/autodrop
+      DATABASE_URL: postgresql://autodrop:autodrop_secret@localhost:5432/autodrop
       NEXTAUTH_URL: http://127.0.0.1:3000
       NEXTAUTH_SECRET: ci-nextauth-secret-value
       ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
