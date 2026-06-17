@@ -1,7 +1,11 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse } from "next/server";
+import NextAuth from "next-auth";
+import { edgeAuthConfig } from "@/lib/auth.config";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
-function applySecurityHeaders(response: NextResponse) {
+const { auth } = NextAuth(edgeAuthConfig);
+
+function applySecurityHeaders(response: NextResponse): NextResponse {
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
@@ -9,20 +13,11 @@ function applySecurityHeaders(response: NextResponse) {
   return response;
 }
 
-function hasSessionCookie(request: NextRequest) {
-  return (
-    request.cookies.has("authjs.session-token") ||
-    request.cookies.has("__Secure-authjs.session-token") ||
-    request.cookies.has("next-auth.session-token") ||
-    request.cookies.has("__Secure-next-auth.session-token")
-  );
-}
-
-export async function middleware(request: NextRequest) {
-  const pathname = request.nextUrl.pathname;
+export default auth(function middleware(req) {
+  const pathname = req.nextUrl.pathname;
 
   if (pathname.startsWith("/api/auth/")) {
-    const ip = getClientIp(request);
+    const ip = getClientIp(req);
     const result = checkRateLimit(`auth:${ip}`, 20, 60_000);
 
     if (!result.allowed) {
@@ -35,14 +30,15 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (pathname.startsWith("/dashboard") && !hasSessionCookie(request)) {
-    const signInUrl = new URL("/auth/sign-in", request.url);
+  // `req.auth` is the validated session from the JWT — not just cookie presence.
+  if (pathname.startsWith("/dashboard") && !req.auth?.user) {
+    const signInUrl = new URL("/auth/sign-in", req.url);
     signInUrl.searchParams.set("callbackUrl", pathname);
     return applySecurityHeaders(NextResponse.redirect(signInUrl));
   }
 
   return applySecurityHeaders(NextResponse.next());
-}
+});
 
 export const config = {
   matcher: ["/dashboard/:path*", "/api/auth/:path*"]
